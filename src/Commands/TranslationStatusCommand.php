@@ -18,15 +18,6 @@ class TranslationStatusCommand
     public function __construct(
         protected Filesystem $filesystem = new Filesystem(),
     ) {}
-    // todo: идея такая - у нас уже новые файлы содержат ключ и значение. Просто фильтруем по следующим правилам:
-    // если КЛЮЧ найден в excludes - удаляем
-    // если КЛЮЧ и ЗНАЧЕНИЕ различаются - удаляем
-    // на выходе останутся непереведённые строки
-    // сохраняем их в файл `_status.json`
-    //
-    // структура внутри файла:
-    //   - ключ это имя исходного файла
-    //   - в массиве - значения для файла 
 
     public function __invoke(
         OutputInterface $output,

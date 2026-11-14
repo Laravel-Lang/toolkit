@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -23,18 +25,11 @@ class StatusCommand
 
     public function __invoke(
         OutputInterface $output,
-        #[Option('Project directory')]
-        ?string $directory = null,
+        #[Argument('Project directory')]
+        string $directory,
     ): int {
-        if ($directory === null) {
-            $output->writeln('<error>No translation directory set</error>');
-
-            return Command::FAILURE;
-        }
-
         if (! $path = realpath($directory . '/locales')) {
             $output->writeln('<error>The "locales" directory doesn\'t exists!</error>');
-            $output->writeln("<error>$directory/locales</error>");
 
             return Command::FAILURE;
         }
@@ -62,17 +57,25 @@ class StatusCommand
             $content = $this->read($file->getRealPath());
             $key     = $file->getFilenameWithoutExtension();
 
-            $result[$key] = array_filter(
-                array   : $content,
-                callback: static function (string $value, string $key) use ($excludes): bool {
+            $result[$key] = (new Collection($content))
+                ->filter(static function (string $value, string $key) use ($excludes): bool {
                     if (in_array($key, $excludes, true)) {
                         return false;
                     }
 
                     return $key === $value;
-                },
-                mode    : ARRAY_FILTER_USE_BOTH
-            );
+                })
+                ->sort(static function (string $a, string $b): int {
+                    $a = Str::lower($a);
+                    $b = Str::lower($b);
+
+                    if ($a === $b) {
+                        return 0;
+                    }
+
+                    return $a < $b ? -1 : 1;
+                })
+                ->all();
         }
 
         return $result;

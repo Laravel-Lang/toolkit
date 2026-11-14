@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 use LaravelLang\Toolkit\Commands\CreateLocaleCommand;
 use LaravelLang\Toolkit\Commands\DeleteLocaleCommand;
+use LaravelLang\Toolkit\Commands\DownloadCommand;
 use LaravelLang\Toolkit\Commands\StatusCommand;
 use Symfony\Component\Console\Application;
 
@@ -15,5 +16,6 @@ $app = new Application(name: 'Laravel-Lang: Toolkit');
 $app->addCommand(new StatusCommand());
 $app->addCommand(new CreateLocaleCommand());
 $app->addCommand(new DeleteLocaleCommand());
+$app->addCommand(new DownloadCommand());
 
 $app->run();

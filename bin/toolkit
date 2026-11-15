@@ -7,6 +7,7 @@ use LaravelLang\Toolkit\Commands\CreateLocaleCommand;
 use LaravelLang\Toolkit\Commands\DeleteLocaleCommand;
 use LaravelLang\Toolkit\Commands\DownloadCommand;
 use LaravelLang\Toolkit\Commands\StatusCommand;
+use LaravelLang\Toolkit\Commands\SyncCommand;
 use Symfony\Component\Console\Application;
 
 require __DIR__ . '/../../../vendor/autoload.php';
@@ -17,5 +18,6 @@ $app->addCommand(new StatusCommand());
 $app->addCommand(new CreateLocaleCommand());
 $app->addCommand(new DeleteLocaleCommand());
 $app->addCommand(new DownloadCommand());
+$app->addCommand(new SyncCommand());
 
 $app->run();

@@ -14,10 +14,16 @@ require __DIR__ . '/../../../vendor/autoload.php';
 
 $app = new Application(name: 'Laravel-Lang: Toolkit');
 
+$commands = new SyncCommand();
+
+$app->addCommands([
+    $commands->package(...),
+    $commands->library(...),
+]);
+
 $app->addCommand(new StatusCommand());
 $app->addCommand(new CreateLocaleCommand());
 $app->addCommand(new DeleteLocaleCommand());
 $app->addCommand(new DownloadCommand());
-$app->addCommand(new SyncCommand());
 
 $app->run();

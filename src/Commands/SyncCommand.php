@@ -20,14 +20,15 @@ use function array_values;
 use function is_dir;
 use function str_starts_with;
 
-#[AsCommand(name: 'sync:package')]
+#[AsCommand(name: 'sync')]
 class SyncCommand
 {
     public function __construct(
         protected Filesystem $filesystem = new Filesystem(),
     ) {}
 
-    public function __invoke(
+    #[AsCommand(name: 'package')]
+    public function package(
         #[Argument('Path for package', suggestedValues: ['.'])]
         string $path = '.',
     ): int {
@@ -73,6 +74,12 @@ class SyncCommand
             }
         }
 
+        return Command::SUCCESS;
+    }
+
+    #[AsCommand(name: 'package')]
+    public function library(): int
+    {
         return Command::SUCCESS;
     }
 

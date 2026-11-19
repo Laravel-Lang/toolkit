@@ -7,7 +7,7 @@ namespace LaravelLang\Toolkit\Services;
 use Illuminate\Support\Str;
 use Symfony\Component\Finder\Finder;
 
-class TranslationKeys
+class TranslationKeysService
 {
     public function find(string $directory): array
     {

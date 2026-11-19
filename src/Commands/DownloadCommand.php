@@ -6,8 +6,8 @@ namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Client\Factory;
-use LaravelLang\Toolkit\Services\TranslationFiles;
-use LaravelLang\Toolkit\Services\TranslationKeys;
+use LaravelLang\Toolkit\Services\TranslationFilesService;
+use LaravelLang\Toolkit\Services\TranslationKeysService;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
@@ -25,8 +25,8 @@ class DownloadCommand
     public function __construct(
         protected Filesystem $filesystem = new Filesystem(),
         protected Factory $http = new Factory(),
-        protected TranslationKeys $keys = new TranslationKeys(),
-        protected TranslationFiles $translations = new TranslationFiles(),
+        protected TranslationKeysService $keys = new TranslationKeysService(),
+        protected TranslationFilesService $translations = new TranslationFilesService(),
     ) {}
 
     public function __invoke(

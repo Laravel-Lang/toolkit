@@ -8,7 +8,7 @@ use Illuminate\Filesystem\Filesystem;
 use RuntimeException;
 use Throwable;
 
-class TranslationFiles
+class TranslationFilesService
 {
     public function __construct(
         protected Filesystem $filesystem = new Filesystem(),

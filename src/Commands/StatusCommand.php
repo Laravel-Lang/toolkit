@@ -70,6 +70,7 @@ final class StatusCommand
                 ->sort(static function (string $a, string $b): int {
                     $a = Str::lower($a);
                     $b = Str::lower($b);
+
                     return $a <=> $b;
                 })
                 ->all();

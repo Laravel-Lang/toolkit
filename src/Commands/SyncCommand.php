@@ -20,7 +20,7 @@ abstract class SyncCommand
     protected LangFs $langFs;
 
     public function __construct(
-        protected Filesystem $filesystem = new Filesystem(),
+        protected Filesystem $filesystem = new Filesystem,
     ) {
         $this->langFs = new LangFs(
             filesystem   : $this->filesystem,

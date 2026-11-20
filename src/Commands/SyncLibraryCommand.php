@@ -5,23 +5,22 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Support\Arr;
-use LaravelLang\LocaleList\Locale;
+use RuntimeException;
+use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
-
-use function array_intersect_key;
 
 #[AsCommand(name: 'sync:library')]
 class SyncLibraryCommand extends SyncCommand
 {
-    protected string $basePath = __DIR__ . '/../../../';
+    public function __invoke(
+        #[Argument('Directory containing translation packages and Library')]
+        string $path = __DIR__ . '/../../..',
+    ): int {
+        $source = $this->loadSources($path);
 
-    public function __invoke(): int
-    {
-        $source = $this->loadSources($this->basePath);
-
-        foreach (Locale::values() as $locale) {
-            foreach ($this->filesystem->files($this->basePath . 'Library/locales/' . $locale) as $file) {
+        foreach ($this->localeDirectories($path . '/Library/locales') as $directory) {
+            foreach ($this->filesystem->files($directory) as $file) {
                 if (str_starts_with($file->getFilename(), '_')) {
                     continue;
                 }
@@ -41,8 +40,12 @@ class SyncLibraryCommand extends SyncCommand
     {
         $result = [];
 
-        foreach ($this->filesystem->glob($path . '*/laravel_lang.json') as $settings) {
+        foreach ($this->filesystem->glob(rtrim($path, '/\\') . '/*/laravel_lang.json') as $settings) {
             $result = array_merge($result, $this->loadSource(dirname($settings)));
+        }
+
+        if (! $result) {
+            throw new RuntimeException("No translation packages found in [$path].");
         }
 
         return $result;

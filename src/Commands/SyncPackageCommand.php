@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Support\Arr;
-use LaravelLang\LocaleList\Locale;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -31,8 +30,8 @@ class SyncPackageCommand extends SyncCommand
 
         $source = $this->loadSource($path);
 
-        foreach (Locale::values() as $locale) {
-            foreach ($this->filesystem->files($path . '/locales/' . $locale) as $file) {
+        foreach ($this->localeDirectories($path . '/locales') as $directory) {
+            foreach ($this->filesystem->files($directory) as $file) {
                 if (str_starts_with($file->getFilename(), '_')) {
                     continue;
                 }

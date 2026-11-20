@@ -34,10 +34,12 @@ class StatusCommand
             return Command::FAILURE;
         }
 
-        foreach ($this->filesystem->directories($path) as $directory) {
-            $settings = $this->read($path . '/_settings.json');
+        $settings = $this->read($path . '/_settings.json');
 
-            $result = $this->process($directory, $settings['excludes'] ?? []);
+        foreach ($this->filesystem->directories($path) as $directory) {
+            $local = $this->read($directory . '/_settings.json');
+            $excludes = array_merge($settings['excludes'] ?? [], $local['excludes'] ?? []);
+            $result = $this->process($directory, $excludes);
 
             $this->store($directory, $result);
         }

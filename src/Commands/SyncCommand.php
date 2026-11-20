@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Collection;
-
-use function array_filter;
+use Illuminate\Support\Arr;
+use LaravelLang\LocaleList\Locale;
+use RuntimeException;
+use Throwable;
 
 abstract class SyncCommand
 {
@@ -26,14 +27,38 @@ abstract class SyncCommand
                 continue;
             }
 
-            $content = mb_strtolower($file->getExtension()) === 'php'
-                ? $this->loadPhp($file->getRealPath())
-                : $this->loadJson($file->getRealPath());
+            $source = $file->getPathname();
+
+            try {
+                $content = mb_strtolower($file->getExtension()) === 'php'
+                    ? $this->loadPhp($source)
+                    : $this->loadJson($source);
+            } catch (Throwable $exception) {
+                throw new RuntimeException("Unable to read translation source [$source]: " . $exception->getMessage(), 0, $exception);
+            }
+
+            $content = array_filter($content, static fn (mixed $key): bool => $key !== '');
+
+            if (! $content) {
+                throw new RuntimeException("The translation source [$source] contains no keys.");
+            }
 
             $result = array_merge($result, $content);
         }
 
-        return array_values(array_unique(array_filter($result)));
+        if (! $result) {
+            throw new RuntimeException("No translation sources found in [$path].");
+        }
+
+        return array_values(array_unique($result));
+    }
+
+    protected function localeDirectories(string $path): array
+    {
+        return array_filter(
+            $this->filesystem->directories($path),
+            static fn (string $directory): bool => Locale::tryFrom(basename($directory)) !== null,
+        );
     }
 
     protected function loadFile(string $path, string $extension): array
@@ -47,21 +72,46 @@ abstract class SyncCommand
 
     protected function loadPhp(string $path): array
     {
-        return (new Collection(require $path))
-            ->dot()
-            ->values()
-            ->all();
+        $content = require $path;
+
+        if (! is_array($content)) {
+            throw new RuntimeException('Expected a PHP translation array.');
+        }
+
+        $keys = [];
+
+        foreach (Arr::dot($content) as $value) {
+            if ($value === []) {
+                continue;
+            }
+
+            if (! is_string($value) && ! is_int($value)) {
+                throw new RuntimeException('Expected PHP translation values to be strings or integers.');
+            }
+
+            $keys[] = $value;
+        }
+
+        return $keys;
     }
 
     protected function loadJson(string $path): array
     {
-        return array_keys(
-            $this->filesystem->json($path)
-        );
+        $content = json_decode($this->filesystem->get($path), flags: JSON_THROW_ON_ERROR);
+
+        if (! is_object($content)) {
+            throw new RuntimeException('Expected a JSON translation object.');
+        }
+
+        return array_keys(get_object_vars($content));
     }
 
     protected function store(string $path, array $content): void
     {
-        $this->filesystem->put($path, json_encode($content, $this->flags));
+        $encoded = strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'php'
+            ? '<?php return ' . var_export($content, true) . ';' . PHP_EOL
+            : json_encode((object) $content, $this->flags);
+
+        $this->filesystem->put($path, $encoded);
     }
 }

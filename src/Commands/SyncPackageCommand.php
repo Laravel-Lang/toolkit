@@ -14,7 +14,7 @@ use function is_dir;
 use function str_starts_with;
 
 #[AsCommand(name: 'sync:package')]
-class SyncPackageCommand extends SyncCommand
+final class SyncPackageCommand extends SyncCommand
 {
     public function __invoke(
         #[Argument('Path for package', suggestedValues: ['.'])]
@@ -36,7 +36,7 @@ class SyncPackageCommand extends SyncCommand
                     continue;
                 }
 
-                $locales = $this->loadFile($file->getRealPath(), $file->getExtension());
+                $locales = $this->langFs->read($file->getRealPath());
 
                 $content = Arr::only($locales, $source);
 

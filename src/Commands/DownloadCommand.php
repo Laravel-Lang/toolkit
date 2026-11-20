@@ -20,7 +20,7 @@ use Throwable;
 use ZipArchive;
 
 #[AsCommand(name: 'download')]
-class DownloadCommand
+final class DownloadCommand
 {
     public function __construct(
         protected Filesystem $filesystem = new Filesystem(),

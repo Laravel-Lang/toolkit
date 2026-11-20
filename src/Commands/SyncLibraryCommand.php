@@ -11,7 +11,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 
 #[AsCommand(name: 'sync:library')]
-class SyncLibraryCommand extends SyncCommand
+final class SyncLibraryCommand extends SyncCommand
 {
     public function __invoke(
         #[Argument('Directory containing translation packages and Library')]

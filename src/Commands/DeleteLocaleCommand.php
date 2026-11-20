@@ -14,7 +14,7 @@ use Symfony\Component\Console\Command\Command;
 use function in_array;
 
 #[AsCommand(name: 'delete-locale')]
-class DeleteLocaleCommand
+final class DeleteLocaleCommand
 {
     public function __construct(
         protected Filesystem $filesystem = new Filesystem(),

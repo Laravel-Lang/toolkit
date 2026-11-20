@@ -11,7 +11,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 
 #[AsCommand(name: 'create-locale')]
-class CreateLocaleCommand
+final class CreateLocaleCommand
 {
     public function __construct(
         protected Filesystem $filesystem = new Filesystem(),

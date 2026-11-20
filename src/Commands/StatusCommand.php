@@ -15,7 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use function in_array;
 
 #[AsCommand(name: 'status')]
-class StatusCommand
+final class StatusCommand
 {
     protected int $flags = JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
 

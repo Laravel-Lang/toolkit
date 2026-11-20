@@ -30,7 +30,11 @@ class TranslationFilesService
 
             return $values;
         } catch (Throwable $exception) {
-            throw new RuntimeException("Unable to read translation file [$path]: {$exception->getMessage()}", 0, $exception);
+            throw new RuntimeException(
+                "Unable to read translation file [$path]: {$exception->getMessage()}",
+                0,
+                $exception
+            );
         }
     }
 
@@ -40,7 +44,14 @@ class TranslationFilesService
             $values = $this->sort($values);
 
             $content = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
-                'json'  => json_encode($values, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION) . PHP_EOL,
+                'json' => json_encode(
+                    $values,
+                    JSON_THROW_ON_ERROR
+                        | JSON_PRETTY_PRINT
+                        | JSON_UNESCAPED_UNICODE
+                        | JSON_UNESCAPED_SLASHES
+                        | JSON_PRESERVE_ZERO_FRACTION
+                ) . PHP_EOL,
                 default => throw new RuntimeException('Only JSON translation files are merged.'),
             };
 
@@ -48,7 +59,11 @@ class TranslationFilesService
                 throw new RuntimeException('The translation file could not be written.');
             }
         } catch (Throwable $exception) {
-            throw new RuntimeException("Unable to write translation file [$path]: {$exception->getMessage()}", 0, $exception);
+            throw new RuntimeException(
+                "Unable to write translation file [$path]: {$exception->getMessage()}",
+                0,
+                $exception
+            );
         }
     }
 
@@ -58,7 +73,9 @@ class TranslationFilesService
             if (is_array($value)) {
                 $values[$key] = $this->sort($value);
             } elseif ((! is_scalar($value) && $value !== null) || (is_float($value) && ! is_finite($value))) {
-                throw new RuntimeException('Translations must contain arrays, strings, finite numbers, booleans or null.');
+                throw new RuntimeException(
+                    'Translations must contain arrays, strings, finite numbers, booleans or null.'
+                );
             }
         }
 

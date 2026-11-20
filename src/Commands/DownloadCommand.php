@@ -48,7 +48,14 @@ final class DownloadCommand
         $completed = false;
 
         try {
-            if (! filter_var($url, FILTER_VALIDATE_URL) || ! in_array(strtolower(parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
+            if (
+                ! filter_var($url, FILTER_VALIDATE_URL)
+                || ! in_array(
+                    strtolower(parse_url($url, PHP_URL_SCHEME)),
+                    ['http', 'https'],
+                    true
+                )
+            ) {
                 throw new RuntimeException('URL must be an HTTP or HTTPS address.');
             }
 
@@ -56,12 +63,15 @@ final class DownloadCommand
                 throw new RuntimeException('The PHP zip extension is required.');
             }
 
-            $paths     = array_map($this->relativePath(...), $paths);
-            $target    = $this->targetPath($directory);
-            $temporary = rtrim(str_replace('\\', '/', sys_get_temp_dir()), '/') . '/laravel-lang-toolkit-' . bin2hex(random_bytes(8));
-            $archive   = $temporary . '/repository.zip';
-            $unpacked  = $temporary . '/repository';
-            $staged    = $temporary . '/result';
+            $paths  = array_map($this->relativePath(...), $paths);
+            $target = $this->targetPath($directory);
+            $temporary
+                = rtrim(str_replace('\\', '/', sys_get_temp_dir()), '/') . '/laravel-lang-toolkit-' . bin2hex(
+                    random_bytes(8)
+                );
+            $archive  = $temporary . '/repository.zip';
+            $unpacked = $temporary . '/repository';
+            $staged   = $temporary . '/result';
 
             $this->filesystem->ensureDirectoryExists($unpacked);
 
@@ -176,9 +186,11 @@ final class DownloadCommand
         }
 
         foreach (explode('/', rtrim($value, '/')) as $segment) {
-            if (in_array($segment, ['', '.', '..'], true)
-                                || preg_match('/[. ]$/', $segment)
-                                || preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i', $segment)) {
+            if (
+                in_array($segment, ['', '.', '..'], true)
+                || preg_match('/[. ]$/', $segment)
+                || preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i', $segment)
+            ) {
                 throw new RuntimeException("Unsafe relative path: $value.");
             }
         }
@@ -237,8 +249,10 @@ final class DownloadCommand
 
                 $this->relativePath($name);
 
-                if ($zip->getExternalAttributesIndex($index, $system, $attributes)
-                    && ($attributes >> 16 & 0o170000) === 0o120000) {
+                if (
+                    $zip->getExternalAttributesIndex($index, $system, $attributes)
+                    && ($attributes >> 16 & 0o170000) === 0o120000
+                ) {
                     throw new RuntimeException("Symbolic links are not allowed in ZIP archives: $name.");
                 }
             }
@@ -309,11 +323,20 @@ final class DownloadCommand
 
                 foreach ($created as $file) {
                     if ($this->filesystem->exists($file) && ! $this->filesystem->delete($file)) {
-                        throw new RuntimeException("Unable to remove incomplete file: $file.", $exception->getCode(), $exception);
+                        throw new RuntimeException(
+                            "Unable to remove incomplete file: $file.",
+                            $exception->getCode(),
+                            $exception
+                        );
                     }
                 }
 
-                if (! $exists && $this->filesystem->isDirectory($target) && $this->filesystem->isEmptyDirectory($target)) {
+                if (
+                    ! $exists && $this->filesystem->isDirectory($target)
+                              && $this->filesystem->isEmptyDirectory(
+                        $target
+                    )
+                ) {
                     rmdir($target);
                 }
             } catch (Throwable $restoreException) {
@@ -326,7 +349,11 @@ final class DownloadCommand
 
             $this->filesystem->deleteDirectory($backup);
 
-            throw new RuntimeException('Unable to publish the source files; previous files were preserved.', 0, $exception);
+            throw new RuntimeException(
+                'Unable to publish the source files; previous files were preserved.',
+                0,
+                $exception
+            );
         }
     }
 }

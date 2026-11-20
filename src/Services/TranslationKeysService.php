@@ -43,24 +43,33 @@ class TranslationKeysService
 
     protected function isTranslatable(string $key): bool
     {
-        if ($key === '' || Str::contains($key, [
-            '$', '::', 'auth.', 'pagination.', 'passwords.', 'validation.', 'prototype', 'constructor', 'object',
-        ])) {
+        if (
+            $key === ''
+            || Str::contains($key, [
+                '$', '::', 'auth.', 'pagination.', 'passwords.', 'validation.', 'prototype', 'constructor', 'object',
+            ])
+        ) {
             return false;
         }
 
         $lower = Str::lower($key);
 
-        if (Str::wordCount($key) > 1 && (
-            $key === str_replace(' ', '_', Str::upper($key)) || $key === str_replace(' ', '_', $lower)
-        )) {
+        if (
+            Str::wordCount($key) > 1
+            && (
+                $key === str_replace(' ', '_', Str::upper($key)) || $key === str_replace(' ', '_', $lower)
+            )
+        ) {
             return false;
         }
 
-        if (! str_contains($key, ' ') && (
-            (Str::contains($key, ['.', '-', '_', ':']) && $key === $lower)
-            || (str_contains($key, '-') && $key === Str::title($key))
-        )) {
+        if (
+            ! str_contains($key, ' ')
+            && (
+                (Str::contains($key, ['.', '-', '_', ':']) && $key === $lower)
+                || (str_contains($key, '-') && $key === Str::title($key))
+            )
+        ) {
             return false;
         }
 

@@ -11,7 +11,7 @@ use Throwable;
 class TranslationFilesService
 {
     public function __construct(
-        protected Filesystem $filesystem = new Filesystem,
+        protected Filesystem $filesystem = new Filesystem(),
     ) {}
 
     public function load(string $path): array

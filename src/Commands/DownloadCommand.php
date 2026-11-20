@@ -23,10 +23,10 @@ use ZipArchive;
 final class DownloadCommand
 {
     public function __construct(
-        protected Filesystem $filesystem = new Filesystem,
-        protected Factory $http = new Factory,
-        protected TranslationKeysService $keys = new TranslationKeysService,
-        protected TranslationFilesService $translations = new TranslationFilesService,
+        protected Filesystem $filesystem = new Filesystem(),
+        protected Factory $http = new Factory(),
+        protected TranslationKeysService $keys = new TranslationKeysService(),
+        protected TranslationFilesService $translations = new TranslationFilesService(),
     ) {}
 
     public function __invoke(
@@ -109,8 +109,8 @@ final class DownloadCommand
                         continue;
                     }
 
-                    $existing = $this->filesystem->exists($destination) ? $this->translations->load($destination) : [];
-                    $incoming = $this->translations->load($file->getPathname());
+                    $existing    = $this->filesystem->exists($destination) ? $this->translations->load($destination) : [];
+                    $incoming    = $this->translations->load($file->getPathname());
 
                     $this->translations->store($destination, array_replace_recursive($existing, $incoming));
                 }
@@ -177,8 +177,8 @@ final class DownloadCommand
 
         foreach (explode('/', rtrim($value, '/')) as $segment) {
             if ($segment === '' || $segment === '.' || $segment === '..'
-                                || preg_match('/[. ]$/', $segment)
-                                || preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i', $segment)) {
+                || preg_match('/[. ]$/', $segment)
+                || preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i', $segment)) {
                 throw new RuntimeException("Unsafe relative path: $value.");
             }
         }
@@ -217,7 +217,7 @@ final class DownloadCommand
 
     protected function unpack(string $archive, string $destination): string
     {
-        $zip = new ZipArchive;
+        $zip = new ZipArchive();
 
         if ($zip->open($archive, ZipArchive::RDONLY) !== true) {
             throw new RuntimeException('The downloaded file is not a readable ZIP archive.');
@@ -238,7 +238,7 @@ final class DownloadCommand
                 $this->relativePath($name);
 
                 if ($zip->getExternalAttributesIndex($index, $system, $attributes)
-                    && ($attributes >> 16 & 0o170000) === 0o120000) {
+                    && ($attributes >> 16 & 0170000) === 0120000) {
                     throw new RuntimeException("Symbolic links are not allowed in ZIP archives: $name.");
                 }
             }

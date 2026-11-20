@@ -20,7 +20,7 @@ final class StatusCommand
     protected int $flags = JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
 
     public function __construct(
-        protected Filesystem $filesystem = new Filesystem,
+        protected Filesystem $filesystem = new Filesystem(),
     ) {}
 
     public function __invoke(
@@ -37,9 +37,9 @@ final class StatusCommand
         $settings = $this->read($path . '/_settings.json');
 
         foreach ($this->filesystem->directories($path) as $directory) {
-            $local    = $this->read($directory . '/_settings.json');
+            $local = $this->read($directory . '/_settings.json');
             $excludes = array_merge($settings['excludes'] ?? [], $local['excludes'] ?? []);
-            $result   = $this->process($directory, $excludes);
+            $result = $this->process($directory, $excludes);
 
             $this->store($directory, $result);
         }
@@ -71,7 +71,11 @@ final class StatusCommand
                     $a = Str::lower($a);
                     $b = Str::lower($b);
 
-                    return $a <=> $b;
+                    if ($a === $b) {
+                        return 0;
+                    }
+
+                    return $a < $b ? -1 : 1;
                 })
                 ->all();
         }

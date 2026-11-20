@@ -52,7 +52,7 @@ abstract class SyncCommand
                 );
             }
 
-            $content = array_filter($content, static fn (mixed $key): bool => $key !== '');
+            $content = array_filter($content, static fn (mixed $key): bool => $key !== '' && $key !== []);
 
             if (! $content) {
                 throw new RuntimeException("The translation source [$source] contains no keys.");

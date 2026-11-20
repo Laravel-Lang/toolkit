@@ -14,7 +14,7 @@ use Symfony\Component\Console\Command\Command;
 final class CreateLocaleCommand
 {
     public function __construct(
-        protected Filesystem $filesystem = new Filesystem(),
+        protected Filesystem $filesystem = new Filesystem,
     ) {}
 
     public function __invoke(

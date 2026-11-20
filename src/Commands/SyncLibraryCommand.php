@@ -44,7 +44,7 @@ final class SyncLibraryCommand extends SyncCommand
             $result = array_merge($result, $this->loadSource(dirname($settings)));
         }
 
-        if (! $result) {
+        if ($result === []) {
             throw new RuntimeException("No translation packages found in [$path].");
         }
 

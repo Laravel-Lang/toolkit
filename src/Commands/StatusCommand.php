@@ -70,12 +70,7 @@ final class StatusCommand
                 ->sort(static function (string $a, string $b): int {
                     $a = Str::lower($a);
                     $b = Str::lower($b);
-
-                    if ($a === $b) {
-                        return 0;
-                    }
-
-                    return $a < $b ? -1 : 1;
+                    return $a <=> $b;
                 })
                 ->all();
         }
@@ -89,7 +84,7 @@ final class StatusCommand
 
         $result = array_filter($content);
 
-        if ($result) {
+        if ($result !== []) {
             $this->filesystem->put($path, json_encode($result, $this->flags));
 
             return;

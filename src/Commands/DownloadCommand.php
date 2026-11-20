@@ -176,7 +176,7 @@ final class DownloadCommand
         }
 
         foreach (explode('/', rtrim($value, '/')) as $segment) {
-            if ($segment === '' || $segment === '.' || $segment === '..'
+            if (in_array($segment, ['', '.', '..'], true)
                                 || preg_match('/[. ]$/', $segment)
                                 || preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i', $segment)) {
                 throw new RuntimeException("Unsafe relative path: $value.");
@@ -304,12 +304,12 @@ final class DownloadCommand
         } catch (Throwable $exception) {
             try {
                 if ($exists && ! $this->filesystem->copyDirectory($backup, $target)) {
-                    throw new RuntimeException('Unable to restore the backup.');
+                    throw new RuntimeException('Unable to restore the backup.', $exception->getCode(), $exception);
                 }
 
                 foreach ($created as $file) {
                     if ($this->filesystem->exists($file) && ! $this->filesystem->delete($file)) {
-                        throw new RuntimeException("Unable to remove incomplete file: $file.");
+                        throw new RuntimeException("Unable to remove incomplete file: $file.", $exception->getCode(), $exception);
                     }
                 }
 

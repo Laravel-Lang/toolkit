@@ -54,14 +54,14 @@ abstract class SyncCommand
 
             $content = array_filter($content, static fn (mixed $key): bool => $key !== '' && $key !== []);
 
-            if (! $content) {
+            if ($content === []) {
                 throw new RuntimeException("The translation source [$source] contains no keys.");
             }
 
             $result = array_merge($result, $content);
         }
 
-        if (! $result) {
+        if ($result === []) {
             throw new RuntimeException("No translation sources found in [$path].");
         }
 

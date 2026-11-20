@@ -333,9 +333,7 @@ final class DownloadCommand
 
                 if (
                     ! $exists && $this->filesystem->isDirectory($target)
-                              && $this->filesystem->isEmptyDirectory(
-                        $target
-                    )
+                              && $this->filesystem->isEmptyDirectory($target)
                 ) {
                     rmdir($target);
                 }

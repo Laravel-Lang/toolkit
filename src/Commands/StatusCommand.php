@@ -17,8 +17,6 @@ use function in_array;
 #[AsCommand(name: 'status')]
 final class StatusCommand
 {
-    protected int $flags = JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
-
     public function __construct(
         protected Filesystem $filesystem = new Filesystem,
     ) {}
@@ -36,17 +34,21 @@ final class StatusCommand
 
         $settings = $this->read($path . '/_settings.json');
 
-        foreach ($this->filesystem->directories($path) as $directory) {
-            $local    = $this->read($directory . '/_settings.json');
+        foreach ($this->filesystem->directories($path) as $dir) {
+            $local    = $this->read($dir . '/_settings.json');
             $excludes = array_merge($settings['excludes'] ?? [], $local['excludes'] ?? []);
-            $result   = $this->process($directory, $excludes);
+            $result   = $this->process($dir, $excludes);
 
-            $this->store($directory, $result);
+            $this->store($dir, $result);
         }
 
         return Command::SUCCESS;
     }
 
+    /**
+     * @param  array<array-key, mixed>  $excludes
+     * @return array<array-key, array<array-key, mixed>>
+     */
     protected function process(string $directory, array $excludes): array
     {
         $result = [];
@@ -79,6 +81,7 @@ final class StatusCommand
         return $result;
     }
 
+    /** @param array<array-key, array<array-key, mixed>> $content */
     protected function store(string $directory, array $content): void
     {
         $path = $directory . '/_status.json';
@@ -86,7 +89,10 @@ final class StatusCommand
         $result = array_filter($content);
 
         if ($result !== []) {
-            $this->filesystem->put($path, json_encode($result, $this->flags));
+            $this->filesystem->put($path, json_encode(
+                $result,
+                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+            ));
 
             return;
         }
@@ -96,6 +102,7 @@ final class StatusCommand
         }
     }
 
+    /** @return array<array-key, mixed> */
     protected function read(string $path): array
     {
         if (! $this->filesystem->exists($path)) {

@@ -14,6 +14,7 @@ class TranslationFilesService
         protected Filesystem $filesystem = new Filesystem,
     ) {}
 
+    /** @return array<array-key, scalar|array<array-key, mixed>|null> */
     public function load(string $path): array
     {
         try {
@@ -38,6 +39,7 @@ class TranslationFilesService
         }
     }
 
+    /** @param array<array-key, mixed> $values */
     public function store(string $path, array $values): void
     {
         try {
@@ -67,6 +69,10 @@ class TranslationFilesService
         }
     }
 
+    /**
+     * @param  array<array-key, mixed>  $values
+     * @return array<array-key, scalar|array<array-key, mixed>|null>
+     */
     protected function sort(array $values): array
     {
         foreach ($values as $key => $value) {

@@ -29,6 +29,7 @@ abstract class SyncCommand
         );
     }
 
+    /** @return non-empty-list<int|string> */
     protected function loadSource(string $path): array
     {
         $result = [];
@@ -41,7 +42,7 @@ abstract class SyncCommand
             $source = $file->getPathname();
 
             try {
-                $content = Arr::dot(
+                $values = Arr::dot(
                     $this->langFs->read($source)
                 );
             } catch (Throwable $exception) {
@@ -52,7 +53,19 @@ abstract class SyncCommand
                 );
             }
 
-            $content = array_filter($content, static fn (mixed $key): bool => $key !== '' && $key !== []);
+            $content = [];
+
+            foreach ($values as $key => $value) {
+                if ($value === '' || $value === []) {
+                    continue;
+                }
+
+                if (! is_int($value) && ! is_string($value)) {
+                    throw new RuntimeException("The translation source [$source] contains a key that is neither a string nor an integer.");
+                }
+
+                $content[$key] = $value;
+            }
 
             if ($content === []) {
                 throw new RuntimeException("The translation source [$source] contains no keys.");
@@ -68,6 +81,7 @@ abstract class SyncCommand
         return array_values(array_unique($result));
     }
 
+    /** @return array<int, string> */
     protected function localeDirectories(string $path): array
     {
         return array_filter(
@@ -76,6 +90,7 @@ abstract class SyncCommand
         );
     }
 
+    /** @param array<array-key, mixed> $content */
     protected function store(string $path, array $content): void
     {
         $this->langFs->storeArray($path, $content);

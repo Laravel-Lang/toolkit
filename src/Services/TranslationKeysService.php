@@ -9,6 +9,7 @@ use Symfony\Component\Finder\Finder;
 
 class TranslationKeysService
 {
+    /** @return array<array-key, string> */
     public function find(string $directory): array
     {
         // shortcut: scans source text, use a language parser if comments or embedded calls need excluding.

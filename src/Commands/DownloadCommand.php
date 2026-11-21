@@ -29,6 +29,7 @@ final class DownloadCommand
         protected TranslationFilesService $translations = new TranslationFilesService,
     ) {}
 
+    /** @param string[] $paths */
     public function __invoke(
         OutputInterface $output,
         #[Option('Source URL')]
@@ -40,7 +41,15 @@ final class DownloadCommand
         #[Option('Copy translations without discovering keys')]
         bool $onlyCopy = false,
     ): int {
-        if ($this->validate($output, $url, $directory)) {
+        if ($url === null || trim($url) === '') {
+            $output->writeln('<error>URL option cannot be empty!</error>');
+
+            return Command::FAILURE;
+        }
+
+        if ($directory === null || trim($directory) === '') {
+            $output->writeln('<error>Directory option cannot be empty!</error>');
+
             return Command::FAILURE;
         }
 
@@ -50,11 +59,8 @@ final class DownloadCommand
         try {
             if (
                 ! filter_var($url, FILTER_VALIDATE_URL)
-                || ! in_array(
-                    strtolower(parse_url($url, PHP_URL_SCHEME)),
-                    ['http', 'https'],
-                    true
-                )
+                || ! is_string($scheme = parse_url($url, PHP_URL_SCHEME))
+                || ! in_array(strtolower($scheme), ['http', 'https'], true)
             ) {
                 throw new RuntimeException('URL must be an HTTP or HTTPS address.');
             }
@@ -146,19 +152,6 @@ final class DownloadCommand
         return Command::SUCCESS;
     }
 
-    protected function validate(OutputInterface $output, ?string $url, ?string $directory): int
-    {
-        foreach (['URL' => $url, 'Directory' => $directory] as $key => $value) {
-            if ($value === null || trim($value) === '') {
-                $output->writeln("<error>$key option cannot be empty!</error>");
-
-                return Command::FAILURE;
-            }
-        }
-
-        return Command::SUCCESS;
-    }
-
     protected function targetPath(string $directory): string
     {
         $directory = str_replace('\\', '/', $directory);
@@ -170,8 +163,12 @@ final class DownloadCommand
             $root      = '/';
             $directory = ltrim($directory, '/');
         } else {
-            $root      = getcwd();
-            $directory = preg_replace('~^(?:\./)+~', '', $directory);
+            if (($root = getcwd()) === false) {
+                throw new RuntimeException('Unable to resolve the current working directory.');
+            }
+
+            $directory = preg_replace('~^(?:\./)+~', '', $directory)
+                ?? throw new RuntimeException('Unable to normalize the destination directory.');
         }
 
         return $this->directoryPath($root, $this->relativePath($directory));

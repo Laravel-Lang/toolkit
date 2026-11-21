@@ -36,6 +36,7 @@ final class SyncLibraryCommand extends SyncCommand
         return Command::SUCCESS;
     }
 
+    /** @return non-empty-list<int|string> */
     protected function loadSources(string $path): array
     {
         $result = [];

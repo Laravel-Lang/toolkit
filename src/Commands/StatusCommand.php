@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
+use TypeError;
 
 use function in_array;
 
@@ -32,17 +32,28 @@ final class StatusCommand
             return Command::FAILURE;
         }
 
-        $settings = $this->read($path . '/_settings.json');
+        $globalExcludes = $this->excludes($path . '/_settings.json');
 
         foreach ($this->filesystem->directories($path) as $dir) {
-            $local    = $this->read($dir . '/_settings.json');
-            $excludes = array_merge($settings['excludes'] ?? [], $local['excludes'] ?? []);
+            $excludes = array_merge($globalExcludes, $this->excludes($dir . '/_settings.json'));
             $result   = $this->process($dir, $excludes);
 
             $this->store($dir, $result);
         }
 
         return Command::SUCCESS;
+    }
+
+    /** @return array<array-key, mixed> */
+    protected function excludes(string $path): array
+    {
+        $excludes = $this->read($path)['excludes'] ?? [];
+
+        if (! is_array($excludes)) {
+            throw new TypeError("The excludes setting in [$path] must be an array.");
+        }
+
+        return $excludes;
     }
 
     /**
@@ -58,24 +69,24 @@ final class StatusCommand
                 continue;
             }
 
-            $content = $this->read($file->getRealPath());
-            $key     = $file->getFilenameWithoutExtension();
+            $path    = $file->getRealPath();
+            $missing = [];
 
-            $result[$key] = (new Collection($content))
-                ->filter(static function (string $value, string $key) use ($excludes): bool {
-                    if (in_array($key, $excludes, true)) {
-                        return false;
-                    }
+            foreach ($this->read($path) as $key => $value) {
+                if (! is_scalar($value)) {
+                    throw new TypeError("Translation values in [$path] must be scalar.");
+                }
 
-                    return $key === $value;
-                })
-                ->sort(static function (string $a, string $b): int {
-                    $a = Str::lower($a);
-                    $b = Str::lower($b);
+                $name = (string) $key;
 
-                    return $a <=> $b;
-                })
-                ->all();
+                if ($name === (string) $value && ! in_array($name, $excludes, true)) {
+                    $missing[$key] = $value;
+                }
+            }
+
+            uksort($missing, static fn (int|string $a, int|string $b): int => Str::lower((string) $a) <=> Str::lower((string) $b));
+
+            $result[$file->getFilenameWithoutExtension()] = $missing;
         }
 
         return $result;

@@ -29,7 +29,10 @@ class TranslationFilesService
                 throw new RuntimeException('The translation file must contain an array or object.');
             }
 
-            return $values;
+            return array_filter(
+                $values,
+                static fn (mixed $value): bool => is_scalar($value) || is_array($value) || $value === null,
+            );
         } catch (Throwable $exception) {
             throw new RuntimeException(
                 "Unable to read translation file [$path]: {$exception->getMessage()}",

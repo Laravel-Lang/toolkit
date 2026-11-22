@@ -11,6 +11,7 @@ use LaravelLang\Toolkit\Services\TranslationKeysService;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
@@ -276,6 +277,10 @@ final class DownloadCommand
         );
 
         foreach ($files as $file) {
+            if (! $file instanceof SplFileInfo) {
+                throw new RuntimeException('Unable to inspect source files in: ' . $directory);
+            }
+
             if ($file->isLink()) {
                 throw new RuntimeException('Symbolic links are not allowed in source files: ' . $file->getPathname());
             }

@@ -1,0 +1,41 @@
+{
+    "name": "laravel-lang/toolkit",
+    "description": "Laravel Lang Toolkit",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "laravel-lang",
+        "toolkit"
+    ],
+    "authors": [
+        {
+            "name": "Andrey Helldar",
+            "email": "helldar@dragon-code.pro"
+        },
+        {
+            "name": "Laravel Lang Team",
+            "homepage": "https://laravel-lang.com"
+        }
+    ],
+    "homepage": "https://laravel-lang.com",
+    "support": {
+        "source": "https://github.com/Laravel-Lang/mona"
+    },
+    "require": {
+        "php": "^8.3",
+        "illuminate/filesystem": "^12.0 || ^13.0 || dev-master",
+        "illuminate/http": "^12.0 || ^13.0 || dev-master",
+        "illuminate/support": "^12.0 || ^13.0 || dev-master",
+        "laravel-lang/exceptions": "self.version",
+        "laravel-lang/filesystem": "self.version",
+        "laravel-lang/locale-list": "self.version",
+        "symfony/console": "^7.4 || ^8.1",
+        "symfony/finder": "^7.4 || ^8.1"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true
+    }
+}

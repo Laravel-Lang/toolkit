@@ -98,7 +98,7 @@ final class MigrateLocalesCommand
             }
 
             foreach ($source as $legacyKey => $phrase) {
-                if ($phrase === '' || $phrase === [] || $phrase === null) {
+                if (in_array($phrase, ['', [], null], true)) {
                     continue;
                 }
                 if (! is_int($phrase) && ! is_string($phrase)) {

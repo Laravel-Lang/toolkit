@@ -6,8 +6,8 @@ namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use LaravelLang\Exceptions\TranslationDirectoryNotFoundException;
 use LaravelLang\LocaleList\Locale;
-use RuntimeException;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -26,7 +26,7 @@ final class DeleteLocaleCommand
         string $directory,
     ): int {
         if (($path = realpath($directory . '/locales')) === false) {
-            throw new RuntimeException('The "locales" directory does not exist.');
+            throw TranslationDirectoryNotFoundException::forProjectLocales();
         }
 
         $locales = Locale::values();

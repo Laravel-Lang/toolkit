@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Support\Arr;
-use RuntimeException;
+use LaravelLang\Exceptions\TranslationPackageNotFoundException;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -46,7 +46,7 @@ final class SyncLibraryCommand extends SyncCommand
         }
 
         if ($result === []) {
-            throw new RuntimeException("No translation packages found in [$path].");
+            throw new TranslationPackageNotFoundException($path);
         }
 
         return $result;

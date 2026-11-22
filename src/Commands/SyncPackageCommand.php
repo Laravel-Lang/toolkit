@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Support\Arr;
-use RuntimeException;
+use LaravelLang\Exceptions\TranslationDirectoryNotFoundException;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -21,11 +21,11 @@ final class SyncPackageCommand extends SyncCommand
         string $path = '.',
     ): int {
         if (! is_dir($path)) {
-            throw new RuntimeException('Directory does not exist.');
+            throw TranslationDirectoryNotFoundException::forPackage();
         }
 
         if (! is_dir($path . '/locales')) {
-            throw new RuntimeException('Locales directory does not exist.');
+            throw TranslationDirectoryNotFoundException::forPackageLocales();
         }
 
         $source = $this->loadSource($path);

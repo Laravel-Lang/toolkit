@@ -6,11 +6,13 @@ namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use JsonException;
+use LaravelLang\Exceptions\InvalidJsonEncodeException;
+use LaravelLang\Exceptions\InvalidTranslationStatusException;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
-use TypeError;
 
 use function in_array;
 
@@ -50,7 +52,7 @@ final class StatusCommand
         $excludes = $this->read($path)['excludes'] ?? [];
 
         if (! is_array($excludes)) {
-            throw new TypeError("The excludes setting in [$path] must be an array.");
+            throw InvalidTranslationStatusException::invalidExcludes($path);
         }
 
         return $excludes;
@@ -74,7 +76,7 @@ final class StatusCommand
 
             foreach ($this->read($path) as $key => $value) {
                 if (! is_scalar($value)) {
-                    throw new TypeError("Translation values in [$path] must be scalar.");
+                    throw InvalidTranslationStatusException::invalidTranslationValues($path);
                 }
 
                 $name = (string) $key;
@@ -100,10 +102,16 @@ final class StatusCommand
         $result = array_filter($content);
 
         if ($result !== []) {
-            $this->filesystem->put($path, json_encode(
-                $result,
-                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-            ));
+            try {
+                $encoded = json_encode(
+                    $result,
+                    JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+                );
+            } catch (JsonException $exception) {
+                throw InvalidJsonEncodeException::from($exception);
+            }
+
+            $this->filesystem->put($path, $encoded);
 
             return;
         }

@@ -6,11 +6,16 @@ namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Client\Factory;
+use LaravelLang\Exceptions\DownloadArchiveException;
+use LaravelLang\Exceptions\SourceDownloadException;
+use LaravelLang\Exceptions\SourcePathException;
+use LaravelLang\Exceptions\SourcePublicationException;
+use LaravelLang\Exceptions\TranslationDirectoryNotFoundException;
+use LaravelLang\Exceptions\TranslationFileException;
 use LaravelLang\Toolkit\Services\TranslationFilesService;
 use LaravelLang\Toolkit\Services\TranslationKeysService;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use RuntimeException;
 use SplFileInfo;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
@@ -63,11 +68,11 @@ final class DownloadCommand
                 || ! is_string($scheme = parse_url($url, PHP_URL_SCHEME))
                 || ! in_array(strtolower($scheme), ['http', 'https'], true)
             ) {
-                throw new RuntimeException('URL must be an HTTP or HTTPS address.');
+                throw SourceDownloadException::invalidUrl();
             }
 
             if (! class_exists(ZipArchive::class)) {
-                throw new RuntimeException('The PHP zip extension is required.');
+                throw DownloadArchiveException::zipExtensionRequired();
             }
 
             $paths  = array_map($this->relativePath(...), $paths);
@@ -84,9 +89,13 @@ final class DownloadCommand
 
             $output->writeln('Downloading repository...');
 
-            $this->http->connectTimeout(15)->timeout(120)
+            $response = $this->http->connectTimeout(15)->timeout(120)
                 ->withOptions(['allow_redirects' => ['protocols' => ['http', 'https']]])
-                ->sink($archive)->get($url)->throw();
+                ->sink($archive)->get($url);
+
+            if ($exception = $response->toException()) {
+                throw SourceDownloadException::requestFailed($exception);
+            }
 
             $repository = $this->unpack($archive, $unpacked);
 
@@ -94,7 +103,7 @@ final class DownloadCommand
                 $this->checkLinks($target);
 
                 if (! $this->filesystem->copyDirectory($target, $staged)) {
-                    throw new RuntimeException('Unable to prepare the existing source files.');
+                    throw SourcePublicationException::preparationFailed();
                 }
             } else {
                 $this->filesystem->ensureDirectoryExists($staged);
@@ -108,7 +117,7 @@ final class DownloadCommand
                 $selected = $this->directoryPath($repository, $copy);
 
                 if (! $this->filesystem->isDirectory($selected)) {
-                    throw new RuntimeException("Translation directory does not exist: $copy.");
+                    throw TranslationDirectoryNotFoundException::forRequestedPath($copy);
                 }
 
                 foreach ($this->filesystem->allFiles($selected, true) as $file) {
@@ -120,7 +129,7 @@ final class DownloadCommand
 
                     if (strtolower($file->getExtension()) === 'php') {
                         if (! $this->filesystem->copy($file->getPathname(), $destination)) {
-                            throw new RuntimeException('Unable to copy translation file: ' . $file->getPathname());
+                            throw TranslationFileException::unableToCopy($file->getPathname());
                         }
 
                         continue;
@@ -165,11 +174,11 @@ final class DownloadCommand
             $directory = ltrim($directory, '/');
         } else {
             if (($root = getcwd()) === false) {
-                throw new RuntimeException('Unable to resolve the current working directory.');
+                throw SourcePathException::workingDirectoryUnavailable();
             }
 
             $directory = preg_replace('~^(?:\./)+~', '', $directory)
-                ?? throw new RuntimeException('Unable to normalize the destination directory.');
+                ?? throw SourcePathException::destinationNormalizationFailed();
         }
 
         return $this->directoryPath($root, $this->relativePath($directory));
@@ -180,7 +189,7 @@ final class DownloadCommand
         $value = str_replace('\\', '/', $value);
 
         if (preg_match('/[\x00-\x1f<>:"|?*]/', $value)) {
-            throw new RuntimeException("Unsafe relative path: $value.");
+            throw SourcePathException::unsafeRelativePath($value);
         }
 
         foreach (explode('/', rtrim($value, '/')) as $segment) {
@@ -189,7 +198,7 @@ final class DownloadCommand
                 || preg_match('/[. ]$/', $segment)
                 || preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i', $segment)
             ) {
-                throw new RuntimeException("Unsafe relative path: $value.");
+                throw SourcePathException::unsafeRelativePath($value);
             }
         }
 
@@ -204,7 +213,7 @@ final class DownloadCommand
             $path .= '/' . $segment;
 
             if (is_link($path) || ($this->filesystem->exists($path) && ! $this->filesystem->isDirectory($path))) {
-                throw new RuntimeException("Expected a directory without symbolic links: $path.");
+                throw SourcePathException::unexpectedDirectory($path);
             }
 
             if (($resolved = realpath($path)) !== false) {
@@ -217,7 +226,7 @@ final class DownloadCommand
                 }
 
                 if (! str_starts_with($real, $base)) {
-                    throw new RuntimeException("Directory escapes the project root: $path.");
+                    throw SourcePathException::outsideProjectRoot($path);
                 }
             }
         }
@@ -230,36 +239,36 @@ final class DownloadCommand
         $zip = new ZipArchive;
 
         if ($zip->open($archive, ZipArchive::RDONLY) !== true) {
-            throw new RuntimeException('The downloaded file is not a readable ZIP archive.');
+            throw DownloadArchiveException::unreadable();
         }
 
         try {
             if ($zip->numFiles === 0) {
-                throw new RuntimeException('The downloaded ZIP archive is empty.');
+                throw DownloadArchiveException::emptyArchive();
             }
 
             for ($index = 0; $index < $zip->numFiles; $index++) {
                 $name = $zip->getNameIndex($index);
 
                 if ($name === false || str_contains($name, '\\')) {
-                    throw new RuntimeException('Invalid ZIP entry path.');
+                    throw DownloadArchiveException::invalidEntryPath();
                 }
 
                 $this->relativePath($name);
 
                 if ($zip->getExternalAttributesIndex($index, $system, $attributes)) {
                     if (! is_int($attributes)) {
-                        throw new RuntimeException("Unable to inspect ZIP entry attributes: $name.");
+                        throw DownloadArchiveException::entryAttributesUnavailable($name);
                     }
 
                     if (($attributes >> 16 & 0o170000) === 0o120000) {
-                        throw new RuntimeException("Symbolic links are not allowed in ZIP archives: $name.");
+                        throw DownloadArchiveException::symbolicLink($name);
                     }
                 }
             }
 
             if (! $zip->extractTo($destination)) {
-                throw new RuntimeException('Unable to extract the ZIP archive.');
+                throw DownloadArchiveException::extractionFailed();
             }
         } finally {
             $zip->close();
@@ -281,11 +290,11 @@ final class DownloadCommand
 
         foreach ($files as $file) {
             if (! $file instanceof SplFileInfo) {
-                throw new RuntimeException('Unable to inspect source files in: ' . $directory);
+                throw SourcePathException::inspectionFailed($directory);
             }
 
             if ($file->isLink()) {
-                throw new RuntimeException('Symbolic links are not allowed in source files: ' . $file->getPathname());
+                throw SourcePathException::symbolicLink($file->getPathname());
             }
         }
     }
@@ -297,12 +306,12 @@ final class DownloadCommand
         if ($exists) {
             try {
                 if (! $this->filesystem->copyDirectory($target, $backup)) {
-                    throw new RuntimeException('Unable to back up the existing source files.');
+                    throw SourcePublicationException::backupFailed();
                 }
             } catch (Throwable $exception) {
                 $this->filesystem->deleteDirectory($backup);
 
-                throw $exception;
+                throw SourcePublicationException::fromBackupFailure($exception);
             }
         }
 
@@ -318,21 +327,17 @@ final class DownloadCommand
 
         try {
             if (! $this->filesystem->copyDirectory($staged, $target)) {
-                throw new RuntimeException('Unable to publish the source files.');
+                throw SourcePublicationException::publicationFailed();
             }
         } catch (Throwable $exception) {
             try {
                 if ($exists && ! $this->filesystem->copyDirectory($backup, $target)) {
-                    throw new RuntimeException('Unable to restore the backup.', $exception->getCode(), $exception);
+                    throw SourcePublicationException::backupRestoreFailed($exception);
                 }
 
                 foreach ($created as $file) {
                     if ($this->filesystem->exists($file) && ! $this->filesystem->delete($file)) {
-                        throw new RuntimeException(
-                            "Unable to remove incomplete file: $file.",
-                            $exception->getCode(),
-                            $exception
-                        );
+                        throw SourcePublicationException::incompleteFileRemovalFailed($file, $exception);
                     }
                 }
 
@@ -343,20 +348,12 @@ final class DownloadCommand
                     rmdir($target);
                 }
             } catch (Throwable $restoreException) {
-                $recovery = $exists
-                    ? "The previous files are preserved at $backup."
-                    : "Incomplete files may remain at $target.";
-
-                throw new RuntimeException("Unable to restore source files. $recovery", 0, $restoreException);
+                throw SourcePublicationException::restoreFailed($target, $exists ? $backup : null, $restoreException);
             }
 
             $this->filesystem->deleteDirectory($backup);
 
-            throw new RuntimeException(
-                'Unable to publish the source files; previous files were preserved.',
-                0,
-                $exception
-            );
+            throw SourcePublicationException::publicationFailedAfterRollback($exception);
         }
     }
 }

@@ -6,11 +6,11 @@ namespace LaravelLang\Toolkit\Commands;
 
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Arr;
+use LaravelLang\Exceptions\TranslationSourceException;
 use LaravelLang\Filesystem\Filesystem as LangFs;
 use LaravelLang\Filesystem\Processors\JsonProcessor;
 use LaravelLang\Filesystem\Processors\PhpProcessor;
 use LaravelLang\LocaleList\Locale;
-use RuntimeException;
 use Throwable;
 
 abstract class SyncCommand
@@ -46,11 +46,7 @@ abstract class SyncCommand
                     $this->langFs->read($source)
                 );
             } catch (Throwable $exception) {
-                throw new RuntimeException(
-                    "Unable to read translation source [$source]: " . $exception->getMessage(),
-                    0,
-                    $exception
-                );
+                throw TranslationSourceException::unableToRead($source, $exception);
             }
 
             $content = [];
@@ -61,21 +57,21 @@ abstract class SyncCommand
                 }
 
                 if (! is_int($value) && ! is_string($value)) {
-                    throw new RuntimeException("The translation source [$source] contains a key that is neither a string nor an integer.");
+                    throw TranslationSourceException::invalidKey($source);
                 }
 
                 $content[$key] = $value;
             }
 
             if ($content === []) {
-                throw new RuntimeException("The translation source [$source] contains no keys.");
+                throw TranslationSourceException::missingKeys($source);
             }
 
             $result = array_merge($result, $content);
         }
 
         if ($result === []) {
-            throw new RuntimeException("No translation sources found in [$path].");
+            throw TranslationSourceException::sourcesNotFound($path);
         }
 
         return array_values(array_unique($result));

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace LaravelLang\Toolkit\Services;
 
 use Illuminate\Filesystem\Filesystem;
-use RuntimeException;
+use LaravelLang\Exceptions\TranslationFileException;
 use Throwable;
 
 class TranslationFilesService
@@ -22,11 +22,11 @@ class TranslationFilesService
 
             $values = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
                 'json'  => json_decode($content, true, 512, JSON_THROW_ON_ERROR),
-                default => throw new RuntimeException('Only JSON translation files are merged.'),
+                default => throw TranslationFileException::unsupportedMergeFormat(),
             };
 
             if (! is_array($values)) {
-                throw new RuntimeException('The translation file must contain an array or object.');
+                throw TranslationFileException::invalidRoot();
             }
 
             return array_filter(
@@ -34,11 +34,7 @@ class TranslationFilesService
                 static fn (mixed $value): bool => is_scalar($value) || is_array($value) || $value === null,
             );
         } catch (Throwable $exception) {
-            throw new RuntimeException(
-                "Unable to read translation file [$path]: {$exception->getMessage()}",
-                0,
-                $exception
-            );
+            throw TranslationFileException::unableToRead($path, $exception);
         }
     }
 
@@ -57,18 +53,14 @@ class TranslationFilesService
                         | JSON_UNESCAPED_SLASHES
                         | JSON_PRESERVE_ZERO_FRACTION
                 ) . PHP_EOL,
-                default => throw new RuntimeException('Only JSON translation files are merged.'),
+                default => throw TranslationFileException::unsupportedMergeFormat(),
             };
 
             if ($this->filesystem->put($path, $content) === false) {
-                throw new RuntimeException('The translation file could not be written.');
+                throw TranslationFileException::writeFailed();
             }
         } catch (Throwable $exception) {
-            throw new RuntimeException(
-                "Unable to write translation file [$path]: {$exception->getMessage()}",
-                0,
-                $exception
-            );
+            throw TranslationFileException::unableToWrite($path, $exception);
         }
     }
 
@@ -82,9 +74,7 @@ class TranslationFilesService
             if (is_array($value)) {
                 $values[$key] = $this->sort($value);
             } elseif ((! is_scalar($value) && $value !== null) || (is_float($value) && ! is_finite($value))) {
-                throw new RuntimeException(
-                    'Translations must contain arrays, strings, finite numbers, booleans or null.'
-                );
+                throw TranslationFileException::invalidValues();
             }
         }
 

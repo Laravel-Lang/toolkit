@@ -247,11 +247,14 @@ final class DownloadCommand
 
                 $this->relativePath($name);
 
-                if (
-                    $zip->getExternalAttributesIndex($index, $system, $attributes)
-                    && ($attributes >> 16 & 0o170000) === 0o120000
-                ) {
-                    throw new RuntimeException("Symbolic links are not allowed in ZIP archives: $name.");
+                if ($zip->getExternalAttributesIndex($index, $system, $attributes)) {
+                    if (! is_int($attributes)) {
+                        throw new RuntimeException("Unable to inspect ZIP entry attributes: $name.");
+                    }
+
+                    if (($attributes >> 16 & 0o170000) === 0o120000) {
+                        throw new RuntimeException("Symbolic links are not allowed in ZIP archives: $name.");
+                    }
                 }
             }
 

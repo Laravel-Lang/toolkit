@@ -41,7 +41,7 @@ final class SyncLibraryCommand extends SyncCommand
     {
         $result = [];
 
-        foreach ($this->filesystem->glob(rtrim($path, '/\\') . '/*/laravel_lang.json') as $settings) {
+        foreach ($this->filesystem->glob(rtrim($path, '/\\') . '/*/laravel_lang.json') ?: [] as $settings) {
             $result = array_merge($result, $this->loadSource(dirname($settings)));
         }
 

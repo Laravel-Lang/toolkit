@@ -51,7 +51,7 @@ abstract class SyncCommand
 
             $content = [];
 
-            foreach ($values as $key => $value) {
+            foreach ($values as $value) {
                 if ($value === '' || $value === []) {
                     continue;
                 }
@@ -60,7 +60,7 @@ abstract class SyncCommand
                     throw TranslationSourceException::invalidKey($source);
                 }
 
-                $content[$key] = $value;
+                $content[] = $value;
             }
 
             if ($content === []) {

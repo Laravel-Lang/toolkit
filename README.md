@@ -12,7 +12,7 @@
 
 ## Documentation
 
-See the [documentation](https://laravel-lang.com/start) for detailed information.
+[Run the translation maintenance commands.](https://laravel-lang.com/toolkit)
 
 ## Contributing
 

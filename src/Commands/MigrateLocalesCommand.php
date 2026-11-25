@@ -4,252 +4,203 @@ declare(strict_types=1);
 
 namespace LaravelLang\Toolkit\Commands;
 
-use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Arr;
-use JsonException;
-use LaravelLang\Exceptions\TranslationDirectoryNotFoundException;
-use LaravelLang\Exceptions\TranslationFileException;
-use LaravelLang\Exceptions\TranslationSourceException;
+use Illuminate\Filesystem\Filesystem as BaseFilesystem;
+use Illuminate\Support\Collection;
+use LaravelLang\Filesystem\Filesystem;
+use LaravelLang\Filesystem\Processors\JsonProcessor;
 use LaravelLang\Filesystem\Processors\PhpProcessor;
-use LaravelLang\Toolkit\Services\TranslationFilesService;
-use RuntimeException;
+use LaravelLang\LocaleList\Locale;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Question\Question;
-use Throwable;
+
+use function array_merge;
+use function array_replace;
+use function array_values;
+use function is_int;
+use function is_string;
+use function json_encode;
+use function ksort;
+use function rtrim;
 
 #[AsCommand(
-    name: 'migrate-locales',
+    name       : 'migrate-locales',
     description: 'Convert a legacy Laravel-Lang project to Mona locale files',
-    help: <<<'HELP'
-        Reads source/ and locales/ from one legacy project and keeps the original files.
+    help       : <<<'HELP'
+        Reads source/ and locales/ from one legacy project and keeps files in source/.
         Writes default.json, inline.json, and _settings.json into locale subdirectories of the target.
         When a phrase already exists in the target dictionary, the migrated translation takes precedence.
+        Deletes migrated legacy dictionaries and exclusion files, including when a separate target is used.
         HELP,
-    usages: ['path/to/project --target=path/to/new/locales'],
+    usages     : ['path/to/project --target=path/to/new/locales'],
 )]
 final class MigrateLocalesCommand
 {
-    public function __construct(
-        protected Filesystem $filesystem = new Filesystem,
-        protected TranslationFilesService $files = new TranslationFilesService,
-    ) {}
+    protected Filesystem $filesystem;
+
+    public function __construct()
+    {
+        $this->filesystem = new Filesystem(
+            filesystem   : $filesystem = new BaseFilesystem,
+            jsonProcessor: new JsonProcessor($filesystem),
+            phpProcessor : new PhpProcessor($filesystem),
+        );
+    }
 
     public function __invoke(
         InputInterface $input,
         OutputInterface $output,
-        #[Argument('Legacy project directory with source/ and locales/')]
+        #[Argument('Legacy project directory with `source/` and `locales/`')]
         string $project,
-        #[Option('Destination for locale directories (prompted when omitted)')]
+        #[Option('Destination for locale directories. By default, project `locales/` directory')]
         ?string $target = null,
     ): int {
-        $source  = $project . '/source';
-        $locales = $project . '/locales';
-        if (! $this->filesystem->isDirectory($project) || ! $this->filesystem->isDirectory($source)) {
-            throw TranslationDirectoryNotFoundException::forRequestedPath($source);
-        }
-        if (! $this->filesystem->isDirectory($locales)) {
-            throw TranslationDirectoryNotFoundException::forRequestedPath($locales);
-        }
+        $target ??= rtrim($project, '/\\') . '/locales';
 
-        if ($target === null && $input->isInteractive()) {
-            $target = (new QuestionHelper)->ask($input, $output, new Question('Destination for locale directories: '));
-        }
-        if (! is_string($target) || trim($target) === '') {
-            throw new RuntimeException('Provide a destination for locale directories with --target.');
-        }
+        $this->excludes($project . '/locales', $target);
 
-        $files = $this->prepare($locales, rtrim($target, '/\\'), $this->sourceKeys($source));
-        if ($files === []) {
-            throw new RuntimeException("No legacy locale files found in [$locales].");
-        }
-
-        foreach ($files as $path => $content) {
-            $this->write($path, $content);
-        }
-
-        $output->writeln('Locale files migrated.');
+        $this->migrateJson($project . '/locales', $target);
+        $this->migratePhp($project, $target);
 
         return Command::SUCCESS;
     }
 
-    /** @return array<string, array<array-key, array<array-key, true>>> */
-    protected function sourceKeys(string $directory): array
+    protected function excludes(string $source, string $target): void
     {
-        $keys = ['json' => [], 'php' => []];
-        $php  = new PhpProcessor($this->filesystem);
+        foreach (Locale::values() as $locale) {
+            $sourcePath = $source . '/' . $locale . '/_excludes.json';
+            $targetPath = $target . '/' . $locale . '/_settings.json';
 
-        foreach ($this->filesystem->allFiles($directory) as $file) {
-            $format = strtolower($file->getExtension());
-            if (! isset($keys[$format]) || str_starts_with($file->getFilename(), '_')) {
+            $sourceData = $this->filesystem->read($sourcePath);
+
+            if ($sourceData === []) {
                 continue;
             }
 
-            $path = $file->getPathname();
-            try {
-                $source = $format === 'php' ? Arr::dot($php->read($path)) : $this->files->load($path);
-            } catch (Throwable $exception) {
-                throw TranslationSourceException::unableToRead($path, $exception);
-            }
+            $targetData = $this->filesystem->read($targetPath, 'excludes');
+            $data       = array_values(array_merge($targetData, $sourceData));
 
-            foreach ($source as $legacyKey => $phrase) {
-                if (in_array($phrase, ['', [], null], true)) {
-                    continue;
-                }
-                if (! is_int($phrase) && ! is_string($phrase)) {
-                    throw TranslationSourceException::invalidKey($path);
-                }
-                $keys[$format][$legacyKey][$phrase] = true;
-            }
+            ksort($data);
+
+            $this->filesystem->store($targetPath, $this->encode(['excludes' => $data]));
+            $this->filesystem->ensureDelete($sourcePath);
         }
-
-        if ($keys['json'] === [] && $keys['php'] === []) {
-            throw TranslationSourceException::sourcesNotFound($directory);
-        }
-
-        return $keys;
     }
 
-    /**
-     * @param  array<string, array<array-key, array<array-key, true>>>  $keys
-     * @return array<string, string>
-     */
-    protected function prepare(string $locales, string $target, array $keys): array
+    protected function migrateJson(string $source, string $target): void
     {
-        $files = [];
+        foreach (Locale::values() as $locale) {
+            $sourceDefaultPath = $source . '/' . $locale . '/json.json';
+            $sourceInlinePath  = $source . '/' . $locale . '/json-inline.json';
 
-        foreach ($this->filesystem->directories($locales) as $directory) {
-            $destination = $target . '/' . basename($directory);
+            $targetDefaultPath = $target . '/' . $locale . '/default.json';
+            $targetInlinePath  = $target . '/' . $locale . '/inline.json';
 
-            foreach (['default' => false, 'inline' => true] as $style => $inline) {
-                $translations = $this->translations($directory, $keys, $inline);
-                if ($translations !== null) {
-                    $path         = $destination . '/' . $style . '.json';
-                    $files[$path] = $this->encode($path, array_replace($this->read($path), $translations));
-                }
+            $sourceDataDefault = $this->filesystem->read($sourceDefaultPath);
+            $sourceDataInline  = $this->filesystem->read($sourceInlinePath);
+
+            $targetDataDefault = $this->filesystem->read($targetDefaultPath);
+            $targetDataInline  = $this->filesystem->read($targetInlinePath);
+
+            $dataDefault = array_replace($targetDataDefault, $sourceDataDefault);
+            $dataInline  = array_replace($targetDataInline, $sourceDataInline);
+
+            ksort($dataDefault);
+            ksort($dataInline);
+
+            if ($dataDefault !== []) {
+                $this->filesystem->store($targetDefaultPath, $this->encode($dataDefault));
             }
 
-            $excludes = $directory . '/_excludes.json';
-            if ($this->filesystem->exists($excludes)) {
-                $path                 = $destination . '/_settings.json';
-                $settings             = $this->read($path);
-                $settings['excludes'] = $this->mergeExcludes($excludes, $settings['excludes'] ?? []);
-                $files[$path]         = $this->encode($path, $settings);
+            if ($dataInline !== []) {
+                $this->filesystem->store($targetInlinePath, $this->encode($dataInline));
             }
+
+            $this->filesystem->ensureDelete($sourceDefaultPath);
+            $this->filesystem->ensureDelete($sourceInlinePath);
         }
-
-        return $files;
     }
 
-    /**
-     * @param  array<string, array<array-key, array<array-key, true>>>  $keys
-     * @return array<array-key, scalar>|null
-     */
-    protected function translations(string $directory, array $keys, bool $inline): ?array
+    protected function migratePhp(string $source, string $target): void
     {
-        $result = null;
-        $suffix = $inline ? '-inline.json' : '.json';
+        $sourceData = [];
 
-        foreach ($keys as $format => $source) {
-            $path = $directory . '/' . $format . $suffix;
-            if (! $this->filesystem->exists($path)) {
+        foreach ($this->filesystem->files($source . '/source') as $file) {
+            if ($this->filesystem->isJson($file->getFilename())) {
                 continue;
             }
 
-            $result ??= [];
-            foreach ($this->files->load($path) as $legacyKey => $translation) {
-                if (! isset($source[$legacyKey]) || $translation === '' || $translation === null) {
-                    continue;
-                }
-                if (! is_scalar($translation)) {
-                    throw new RuntimeException("Expected a scalar translation for [$legacyKey] in [$path].");
-                }
-                foreach (array_keys($source[$legacyKey]) as $phrase) {
-                    if (! $inline || stripos((string) $phrase, ':attribute') !== false) {
-                        $result[$phrase] = $translation;
-                    }
-                }
+            $data = $this->filesystem->read($file->getPathname());
+
+            $normalized = (new Collection($data))
+                ->dot()
+                ->filter()
+                ->forget('custom.attribute-name.rule-name')
+                ->all();
+
+            $sourceData = array_replace($sourceData, $normalized);
+        }
+
+        foreach (Locale::values() as $locale) {
+            $sourceDefaultPath = $source . '/locales/' . $locale . '/php.json';
+            $sourceInlinePath  = $source . '/locales/' . $locale . '/php-inline.json';
+
+            $targetDefaultPath = $target . '/' . $locale . '/default.json';
+            $targetInlinePath  = $target . '/' . $locale . '/inline.json';
+
+            $this->processPhp($sourceDefaultPath, $targetDefaultPath, $sourceData);
+            $this->processPhp($sourceInlinePath, $targetInlinePath, $sourceData);
+        }
+    }
+
+    /** @param array<array-key, mixed> $keys */
+    protected function processPhp(string $sourcePath, string $targetPath, array $keys): void
+    {
+        $sourceData = $this->filesystem->read($sourcePath);
+        $targetData = $this->filesystem->read($targetPath);
+
+        $combinedData = $this->combine($keys, $sourceData);
+
+        if ($combinedData === []) {
+            return;
+        }
+
+        $data = array_replace($targetData, $combinedData);
+
+        ksort($data);
+
+        $this->filesystem->store($targetPath, $this->encode($data));
+        $this->filesystem->ensureDelete($sourcePath);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $source
+     * @param  array<array-key, mixed>  $target
+     * @return array<array-key, mixed>
+     */
+    protected function combine(array $source, array $target): array
+    {
+        $result = [];
+
+        foreach ($target as $key => $value) {
+            $newKey = $source[$key] ?? null;
+
+            if (! $newKey || (! is_int($newKey) && ! is_string($newKey))) {
+                continue;
             }
+
+            $result[$newKey] = $value;
         }
 
         return $result;
     }
 
-    /** @return list<string> */
-    protected function mergeExcludes(string $path, mixed $existing): array
+    /** @param array<array-key, mixed> $data */
+    protected function encode(array $data): string
     {
-        $legacy = $this->files->load($path);
-        if (! is_array($existing) || ! array_is_list($existing) || ! array_is_list($legacy)) {
-            throw new RuntimeException("Expected a list of exclusions while migrating [$path].");
-        }
-
-        $excludes = [...$existing, ...$legacy];
-        foreach ($excludes as $value) {
-            if (! is_string($value)) {
-                throw new RuntimeException("Expected string exclusions while migrating [$path].");
-            }
-        }
-
-        $excludes = array_unique($excludes);
-        sort($excludes, SORT_STRING);
-
-        return $excludes;
-    }
-
-    /** @return array<array-key, mixed> */
-    protected function read(string $path): array
-    {
-        if (! $this->filesystem->exists($path)) {
-            return [];
-        }
-
-        try {
-            $value = json_decode($this->filesystem->get($path), flags: JSON_THROW_ON_ERROR);
-
-            if (! is_object($value) && ! is_array($value)) {
-                throw TranslationFileException::invalidRoot();
-            }
-
-            return (array) $value;
-        } catch (Throwable $exception) {
-            throw TranslationFileException::unableToRead($path, $exception);
-        }
-    }
-
-    /** @param array<array-key, mixed> $values */
-    protected function encode(string $path, array $values): string
-    {
-        ksort($values, SORT_STRING);
-
-        try {
-            return json_encode(
-                (object) $values,
-                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-                                    | JSON_PRESERVE_ZERO_FRACTION,
-            ) . PHP_EOL;
-        } catch (JsonException $exception) {
-            throw TranslationFileException::unableToWrite($path, $exception);
-        }
-    }
-
-    protected function write(string $path, string $content): void
-    {
-        $this->filesystem->ensureDirectoryExists(dirname($path));
-        $temporary = $path . '.' . bin2hex(random_bytes(8)) . '.tmp';
-
-        try {
-            if ($this->filesystem->put($temporary, $content) !== strlen($content) || ! rename($temporary, $path)) {
-                throw TranslationFileException::unableToWrite($path, TranslationFileException::writeFailed());
-            }
-        } finally {
-            if ($this->filesystem->exists($temporary)) {
-                $this->filesystem->delete($temporary);
-            }
-        }
+        return json_encode($data, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 }

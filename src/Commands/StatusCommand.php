@@ -9,8 +9,10 @@ use Illuminate\Support\Str;
 use JsonException;
 use LaravelLang\Exceptions\InvalidJsonEncodeException;
 use LaravelLang\Exceptions\InvalidTranslationStatusException;
+use LaravelLang\Exceptions\TranslationFileException;
 use Symfony\Component\Console\Attribute\Argument;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -27,7 +29,15 @@ final class StatusCommand
         OutputInterface $output,
         #[Argument('Project directory')]
         string $directory,
+        #[Option('Output directory for {locale}.json reports')]
+        ?string $outputDir = null,
     ): int {
+        if ($outputDir === '') {
+            $output->writeln('<error>The output directory cannot be empty.</error>');
+
+            return Command::INVALID;
+        }
+
         if (! $path = realpath($directory . '/locales')) {
             $output->writeln('<error>The "locales" directory doesn\'t exists!</error>');
 
@@ -39,8 +49,9 @@ final class StatusCommand
         foreach ($this->filesystem->directories($path) as $dir) {
             $excludes = array_merge($globalExcludes, $this->excludes($dir . '/_settings.json'));
             $result   = $this->process($dir, $excludes);
+            $report   = $outputDir === null ? $dir . '/_status.json' : $outputDir . '/' . basename($dir) . '.json';
 
-            $this->store($dir, $result);
+            $this->store($report, $result);
         }
 
         return Command::SUCCESS;
@@ -95,10 +106,8 @@ final class StatusCommand
     }
 
     /** @param array<array-key, array<array-key, mixed>> $content */
-    protected function store(string $directory, array $content): void
+    protected function store(string $path, array $content): void
     {
-        $path = $directory . '/_status.json';
-
         $result = array_filter($content);
 
         if ($result !== []) {
@@ -111,7 +120,11 @@ final class StatusCommand
                 throw InvalidJsonEncodeException::from($exception);
             }
 
-            $this->filesystem->put($path, $encoded);
+            $this->filesystem->ensureDirectoryExists(dirname($path));
+
+            if ($this->filesystem->put($path, $encoded) !== strlen($encoded)) {
+                throw TranslationFileException::unableToWrite($path, TranslationFileException::writeFailed());
+            }
 
             return;
         }
